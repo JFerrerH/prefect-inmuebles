@@ -55,7 +55,8 @@ def upload_to_google_drive(projects):
 
     # Load token.json from Secret Block
     token_block = Secret.load("gdrive-user-token")
-    creds = Credentials.from_authorized_user_info(json.loads(token_block.get()))
+    creds = Credentials.from_authorized_user_info(token_block.get())
+
 
     service = build("drive", "v3", credentials=creds)
 
