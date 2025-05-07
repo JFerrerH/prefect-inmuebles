@@ -2,6 +2,11 @@ from prefect import flow, task
 import pandas as pd
 import requests
 from prefect.artifacts import create_markdown_artifact
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from prefect.blocks.system import Secret
+import json
 
 @task
 def fetch_data():
@@ -37,18 +42,34 @@ def fetch_data():
 @task
 def save_to_json(projects):
     df = pd.DataFrame(projects)
-    df.to_json("projects.json", index=False)
     path = "/tmp/projects.json"
     df.to_json(path, orient="records", force_ascii=False)
     print(f"✅ Saved to {path}")
-
-    # Optional: attach as artifact so you can download from the UI
     create_markdown_artifact(f"Project list saved to `{path}` with {len(df)} records.")
+
+@task
+def upload_to_google_drive(projects):
+    df = pd.DataFrame(projects)
+    path = "/tmp/projects.json"
+    df.to_json(path, orient="records", force_ascii=False)
+
+    # Load token.json from Secret Block
+    token_block = Secret.load("gdrive-user-token")
+    creds = Credentials.from_authorized_user_info(json.loads(token_block.get()))
+
+    service = build("drive", "v3", credentials=creds)
+
+    file_metadata = {"name": "projects.json"}
+    media = MediaFileUpload(path, mimetype="application/json")
+    file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+
+    print(f"✅ Uploaded to Google Drive with ID: {file.get('id')}")
 
 @flow(name="fetch-inmuebles")
 def main_flow():
     data = fetch_data()
     save_to_json(data)
+    upload_to_google_drive(data)
 
 if __name__ == "__main__":
     main_flow()
