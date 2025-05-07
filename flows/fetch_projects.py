@@ -1,6 +1,7 @@
 from prefect import flow, task
 import pandas as pd
 import requests
+from prefect.artifacts import create_markdown_artifact
 
 @task
 def fetch_data():
@@ -37,6 +38,12 @@ def fetch_data():
 def save_to_json(projects):
     df = pd.DataFrame(projects)
     df.to_json("projects.json", index=False)
+    path = "/tmp/projects.json"
+    df.to_json(path, orient="records", force_ascii=False)
+    print(f"✅ Saved to {path}")
+
+    # Optional: attach as artifact so you can download from the UI
+    create_markdown_artifact(f"Project list saved to `{path}` with {len(df)} records.")
 
 @flow(name="fetch-inmuebles")
 def main_flow():
