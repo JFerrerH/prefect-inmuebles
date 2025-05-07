@@ -2,11 +2,9 @@ from prefect import flow, task
 import pandas as pd
 import requests
 from prefect.artifacts import create_markdown_artifact
+from google.cloud import storage
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 from prefect.blocks.system import Secret
-import json
 
 @task
 def fetch_data():
@@ -27,7 +25,6 @@ def fetch_data():
     }
 
     all_projects = []
-
     while True:
         response = requests.get(url, headers=headers, params=params)
         data = response.json()
@@ -48,29 +45,29 @@ def save_to_json(projects):
     create_markdown_artifact(f"Project list saved to `{path}` with {len(df)} records.")
 
 @task
-def upload_to_google_drive(projects):
+def upload_to_gcs(projects):
+    # Save to file
     df = pd.DataFrame(projects)
     path = "/tmp/projects.json"
     df.to_json(path, orient="records", force_ascii=False)
 
-    # Load token.json from Secret Block
+    # Load token from Secret block
     token_block = Secret.load("gdrive-user-token")
     creds = Credentials.from_authorized_user_info(token_block.get())
 
+    # Upload to GCS
+    client = storage.Client(credentials=creds)
+    bucket = client.bucket("new-projects-datalake")
+    blob = bucket.blob("projects/projects.json")
+    blob.upload_from_filename(path)
 
-    service = build("drive", "v3", credentials=creds)
-
-    file_metadata = {"name": "projects.json"}
-    media = MediaFileUpload(path, mimetype="application/json")
-    file = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-
-    print(f"✅ Uploaded to Google Drive with ID: {file.get('id')}")
+    print(f"✅ Uploaded to GCS: gs://new-projects-datalake/projects/projects.json")
 
 @flow(name="fetch-inmuebles")
 def main_flow():
     data = fetch_data()
     save_to_json(data)
-    upload_to_google_drive(data)
+    upload_to_gcs(data)
 
 if __name__ == "__main__":
     main_flow()
