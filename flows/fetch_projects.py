@@ -56,7 +56,9 @@ def upload_to_gcs(projects):
     creds = Credentials.from_authorized_user_info(token_block.get())
 
     # Upload to GCS
-    client = storage.Client(credentials=creds)
+    client = storage.Client(
+        credentials=creds,
+        project="newprojects-459119")
     bucket = client.bucket("new-projects-datalake")
     blob = bucket.blob("projects/projects.json")
     blob.upload_from_filename(path)
