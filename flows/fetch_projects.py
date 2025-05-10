@@ -44,32 +44,45 @@ def save_to_json(projects):
     print(f"✅ Saved to {path}")
     create_markdown_artifact(f"Project list saved to `{path}` with {len(df)} records.")
 
+# @task
+# def upload_to_gcs(projects):
+#     # Save to file
+#     df = pd.DataFrame(projects)
+#     path = "/tmp/projects.json"
+#     df.to_json(path, orient="records", force_ascii=False)
+
+#     # Load token from Secret block
+#     token_block = Secret.load("gdrive-user-token")
+#     creds = Credentials.from_authorized_user_info(token_block.get())
+
+#     # Upload to GCS
+#     client = storage.Client(
+#         credentials=creds,
+#         project="newprojects-459119")
+#     bucket = client.bucket("new-projects-datalake")
+#     blob = bucket.blob("projects/projects.json")
+#     blob.upload_from_filename(path)
+
+#     print(f"✅ Uploaded to GCS: gs://new-projects-datalake/projects/projects.json")
+
 @task
-def upload_to_gcs(projects):
-    # Save to file
-    df = pd.DataFrame(projects)
-    path = "/tmp/projects.json"
-    df.to_json(path, orient="records", force_ascii=False)
+def upload_via_cloud_run(projects):
+    url = "https://uploader-130238009337.us-central1.run.app"  # Cloud Run URL
+    headers = {"Content-Type": "application/json"}
 
-    # Load token from Secret block
-    token_block = Secret.load("gdrive-user-token")
-    creds = Credentials.from_authorized_user_info(token_block.get())
+    response = requests.post(url, json=projects, headers=headers)
 
-    # Upload to GCS
-    client = storage.Client(
-        credentials=creds,
-        project="newprojects-459119")
-    bucket = client.bucket("new-projects-datalake")
-    blob = bucket.blob("projects/projects.json")
-    blob.upload_from_filename(path)
-
-    print(f"✅ Uploaded to GCS: gs://new-projects-datalake/projects/projects.json")
+    if response.status_code == 200:
+        print("✅ Uploaded via Cloud Run")
+    else:
+        raise Exception(f"❌ Upload failed: {response.status_code} - {response.text}")
 
 @flow(name="fetch-inmuebles")
 def main_flow():
     data = fetch_data()
     save_to_json(data)
-    upload_to_gcs(data)
+    upload_via_cloud_run(data)
+    #upload_to_gcs(data)
 
 if __name__ == "__main__":
     main_flow()
