@@ -75,7 +75,7 @@ def upload_via_cloud_run(projects):
     if response.status_code == 200:
         print("✅ Uploaded via Cloud Run")
     else:
-        raise Exception(f"❌ Upload failed: {response.status_code} - {response.text}")
+        raise Exception(f"Upload failed: {response.status_code} - {response.text}")
 
 @flow(name="fetch-inmuebles")
 def main_flow():
